@@ -2,7 +2,7 @@
 
 > The decentralized short-form video platform for Ethereum natives. TikTok meets true ownership.
 
-**Live app:** https://app.ethvideos.eth (via ENS contenthash → IPFS)
+**Live app:** https://app.ethvideos.eth.link (via ENS contenthash → IPFS)
 **ENS name:** `app.ethvideos.eth`
 
 ---
