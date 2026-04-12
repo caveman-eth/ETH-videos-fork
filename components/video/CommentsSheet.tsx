@@ -104,12 +104,12 @@ export function CommentsSheet({
           />
 
           <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 28, stiffness: 300 }}
-            className="fixed inset-x-0 bottom-0 z-50 max-w-lg mx-auto bg-eth-card border border-eth-border rounded-t-3xl flex flex-col"
-            style={{ maxHeight: "70dvh" }}
+            initial={{ opacity: 0, scale: 0.96, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 16 }}
+            transition={{ type: "spring", damping: 30, stiffness: 320 }}
+            className="fixed inset-x-4 bottom-4 top-auto z-50 w-auto max-w-lg mx-auto bg-eth-card border border-eth-border rounded-3xl flex flex-col"
+            style={{ maxHeight: "75dvh", left: "50%", transform: "translateX(-50%)", width: "calc(100% - 32px)", maxWidth: 540 }}
           >
             {/* Handle */}
             <div className="flex justify-center pt-3 pb-1 flex-shrink-0">

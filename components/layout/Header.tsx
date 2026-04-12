@@ -2,19 +2,21 @@
 
 import { motion } from "motion/react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { Bell, Search } from "lucide-react";
+import { Bell, Search, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface HeaderProps {
   transparent?: boolean;
   showSearch?: boolean;
   title?: string;
+  onHome?: () => void;
 }
 
 export function Header({
   transparent = false,
   showSearch = false,
   title,
+  onHome,
 }: HeaderProps) {
   return (
     <header
@@ -24,9 +26,17 @@ export function Header({
       )}
     >
       <div className="flex items-center justify-between h-14 px-4 max-w-lg mx-auto">
-        {/* Logo / Title */}
+        {/* Logo / Title / Back */}
         <div className="flex items-center gap-2">
-          {title ? (
+          {onHome ? (
+            <button
+              onClick={onHome}
+              className="flex items-center gap-1 text-muted-foreground hover:text-white transition-colors"
+            >
+              <ChevronLeft size={18} />
+              <span className="text-sm font-semibold">Home</span>
+            </button>
+          ) : title ? (
             <span className="font-bold text-white text-lg">{title}</span>
           ) : (
             <motion.div

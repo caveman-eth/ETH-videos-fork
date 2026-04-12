@@ -1,16 +1,42 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useAccount, useSignMessage } from "wagmi";
-import { createSiweMessage, parseSiweMessage, generateSiweNonce } from "viem/siwe";
+import { createSiweMessage, generateSiweNonce } from "viem/siwe";
+import { recoverMessageAddress } from "viem";
+
+const SESSION_KEY = "siwe-session";
 
 type SIWEStatus = "idle" | "signing" | "verifying" | "authenticated" | "error";
+
+interface SIWESession {
+  address: string;
+  chainId: number;
+}
+
+function loadSession(): SIWESession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as SIWESession;
+  } catch {
+    return null;
+  }
+}
 
 export function useSIWE() {
   const { address, chainId } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const [status, setStatus] = useState<SIWEStatus>("idle");
   const [error, setError] = useState<string | null>(null);
+
+  // Restore session on mount
+  useEffect(() => {
+    const session = loadSession();
+    if (session && address && session.address.toLowerCase() === address.toLowerCase()) {
+      setStatus("authenticated");
+    }
+  }, [address]);
 
   const signIn = useCallback(async (): Promise<boolean> => {
     if (!address || !chainId) return false;
@@ -19,11 +45,9 @@ export function useSIWE() {
     setError(null);
 
     try {
-      // Get nonce from server
-      const nonceRes = await fetch("/api/siwe/nonce");
-      const { nonce } = await nonceRes.json();
+      // Generate nonce client-side — no server needed
+      const nonce = generateSiweNonce();
 
-      // Build SIWE message using viem
       const message = createSiweMessage({
         domain: window.location.host,
         address,
@@ -32,20 +56,22 @@ export function useSIWE() {
         version: "1",
         chainId,
         nonce,
-        expirationTime: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        expirationTime: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
       });
 
       const signature = await signMessageAsync({ message });
 
       setStatus("verifying");
 
-      const verifyRes = await fetch("/api/siwe/verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, signature }),
-      });
+      // Verify signature client-side
+      const recovered = await recoverMessageAddress({ message, signature });
+      if (recovered.toLowerCase() !== address.toLowerCase()) {
+        throw new Error("Signature verification failed");
+      }
 
-      if (!verifyRes.ok) throw new Error("Signature verification failed");
+      // Persist session in localStorage
+      const session: SIWESession = { address, chainId };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 
       setStatus("authenticated");
       return true;
@@ -57,8 +83,8 @@ export function useSIWE() {
     }
   }, [address, chainId, signMessageAsync]);
 
-  const signOut = useCallback(async () => {
-    await fetch("/api/siwe/signout", { method: "POST" });
+  const signOut = useCallback(() => {
+    localStorage.removeItem(SESSION_KEY);
     setStatus("idle");
   }, []);
 

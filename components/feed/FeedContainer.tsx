@@ -17,6 +17,7 @@ interface FeedContainerProps {
   onTabChange: (tab: FeedTab) => void;
   onLoadMore: () => void;
   onRefresh: () => void;
+  onProfileClick?: (address: string) => void;
 }
 
 export function FeedContainer({
@@ -28,12 +29,13 @@ export function FeedContainer({
   onTabChange,
   onLoadMore,
   onRefresh,
+  onProfileClick,
 }: FeedContainerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const observerRef = useRef<IntersectionObserver | null>(null);
 
-  // Intersection observer to track which video is in view
+  // Intersection observer — track active video (50% visible = active)
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect();
 
@@ -45,15 +47,13 @@ export function FeedContainer({
               (entry.target as HTMLElement).dataset.index || "0"
             );
             setActiveIndex(index);
-
-            // Load more when near end
             if (index >= videos.length - 3 && hasMore && !loading) {
               onLoadMore();
             }
           }
         });
       },
-      { threshold: 0.7 }
+      { threshold: 0.5 }
     );
 
     const items = containerRef.current?.querySelectorAll("[data-index]");
@@ -141,6 +141,8 @@ export function FeedContainer({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       >
+        {/* Desktop: constrain feed width; mobile stays full-width */}
+        <div className="feed-inner">
         {videos.length === 0 && !loading ? (
           <EmptyState tab={tab} />
         ) : (
@@ -154,29 +156,24 @@ export function FeedContainer({
                 <VideoCard
                   video={video}
                   isActive={activeIndex === index}
+                  onProfileClick={onProfileClick}
                 />
               </div>
             ))}
 
             {/* Loading more */}
             {loading && (
-              <div className="feed-item flex items-center justify-center bg-eth-dark">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="w-12 h-12 rounded-full border-2 border-neon-cyan border-t-transparent animate-spin" />
-                  <span className="text-muted-foreground text-sm">Loading more videos...</span>
-                </div>
+              <div className="flex items-center justify-center py-10">
+                <div className="w-8 h-8 rounded-full border-2 border-neon-cyan border-t-transparent animate-spin" />
               </div>
             )}
 
             {/* End of feed */}
             {!hasMore && !loading && videos.length > 0 && (
-              <div className="feed-item flex items-center justify-center bg-eth-dark">
+              <div className="flex items-center justify-center py-10">
                 <div className="text-center">
                   <p className="text-muted-foreground text-sm">You've seen everything ✨</p>
-                  <button
-                    onClick={onRefresh}
-                    className="mt-4 text-neon-cyan text-sm font-medium"
-                  >
+                  <button onClick={onRefresh} className="mt-3 text-neon-cyan text-sm font-medium">
                     Refresh feed
                   </button>
                 </div>
@@ -184,6 +181,7 @@ export function FeedContainer({
             )}
           </>
         )}
+        </div> {/* /feed-inner */}
       </div>
     </div>
   );
@@ -191,7 +189,7 @@ export function FeedContainer({
 
 function EmptyState({ tab }: { tab: FeedTab }) {
   return (
-    <div className="feed-item flex items-center justify-center bg-eth-dark">
+    <div className="flex items-center justify-center py-20">
       <div className="text-center px-8">
         <div className="text-5xl mb-4">
           {tab === "following" ? "👥" : "🎬"}

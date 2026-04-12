@@ -1,19 +1,33 @@
-// Livepeer utility functions — no SDK import needed client-side.
-// Video upload and transcoding go through our API routes (server-side).
+// Livepeer utility functions — all client-side.
+// Upload goes through a Cloudflare Worker proxy (NEXT_PUBLIC_LIVEPEER_PROXY_URL)
+// to avoid CORS restrictions on the Livepeer Studio API.
 // Playback uses hls.js directly with Livepeer's CDN URLs.
+
+const PROXY_URL = process.env.NEXT_PUBLIC_LIVEPEER_PROXY_URL?.replace(/\/$/, "");
 
 export async function createLivepeerUpload(name: string): Promise<{
   url: string;
   assetId: string;
 }> {
-  const response = await fetch("/api/livepeer/upload", {
+  if (!PROXY_URL) {
+    throw new Error(
+      "NEXT_PUBLIC_LIVEPEER_PROXY_URL is not set. Deploy the Cloudflare Worker in workers/livepeer-proxy/ and add the URL to .env.local."
+    );
+  }
+
+  const response = await fetch(`${PROXY_URL}/upload`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({
+      name: name || "Untitled Video",
+      staticMp4: true,
+      playbackPolicy: { type: "public" },
+    }),
   });
 
   if (!response.ok) throw new Error("Failed to create upload URL");
-  return response.json();
+  const data = await response.json();
+  return { url: data.url, assetId: data.asset.id };
 }
 
 export async function uploadToLivepeer(
@@ -49,7 +63,7 @@ async function pollForPlaybackId(
   intervalMs = 3000
 ): Promise<string> {
   for (let i = 0; i < maxAttempts; i++) {
-    const res = await fetch(`/api/livepeer/asset/${assetId}`);
+    const res = await fetch(`${PROXY_URL}/asset/${assetId}`);
     if (res.ok) {
       const asset = await res.json();
       if (asset.playbackId) return asset.playbackId;
@@ -60,10 +74,13 @@ async function pollForPlaybackId(
   throw new Error("Timed out waiting for playback ID");
 }
 
+// Livepeer VOD CDN — account-specific path prefix (fixed per Livepeer account)
+const LP_VOD_BASE = "https://vod-cdn.lp-playback.studio/raw/jxf4iblf6wlsyor6526t4tcmtmqa/catalyst-vod-com/hls";
+
 export function getLivepeerThumbnail(playbackId: string): string {
-  return `https://livepeercdn.studio/hls/${playbackId}/thumbnails/keyframe_0.png`;
+  return `${LP_VOD_BASE}/${playbackId}/thumbnails/keyframe_0.png`;
 }
 
 export function getLivepeerHLS(playbackId: string): string {
-  return `https://livepeercdn.studio/hls/${playbackId}/index.m3u8`;
+  return `${LP_VOD_BASE}/${playbackId}/index.m3u8`;
 }

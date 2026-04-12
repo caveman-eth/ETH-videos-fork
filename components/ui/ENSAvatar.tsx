@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useState } from "react";
 import { cn, getAddressColor, truncateAddress } from "@/lib/utils";
 
@@ -52,13 +51,12 @@ export function ENSAvatar({
       style={ringStyle}
     >
       {avatarUrl && !imgError ? (
-        <Image
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
           src={avatarUrl}
           alt={ensName || truncateAddress(address || "")}
-          fill
-          className="object-cover"
+          className="w-full h-full object-cover"
           onError={() => setImgError(true)}
-          sizes="80px"
         />
       ) : (
         <div

@@ -11,7 +11,7 @@ import {
   Loader2,
   AlertCircle,
   ExternalLink,
-  Hash,
+  ImagePlus,
 } from "lucide-react";
 import { useAccount } from "wagmi";
 import { useWriteContract } from "wagmi";
@@ -31,12 +31,12 @@ import {
 } from "@/lib/ipfs";
 import { CONTRACTS, VIDEO_POST_ABI } from "@/lib/contracts";
 import { useENSName } from "@/hooks/useENS";
-import type { UploadProgress } from "@/types";
+import type { UploadProgress, VideoMetadata } from "@/types";
 
 interface UploadModalProps {
   open: boolean;
   onClose: () => void;
-  onSuccess?: (cid: string) => void;
+  onSuccess?: (video: VideoMetadata) => void;
 }
 
 export function UploadModal({ open, onClose, onSuccess }: UploadModalProps) {
@@ -47,6 +47,8 @@ export function UploadModal({ open, onClose, onSuccess }: UploadModalProps) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [caption, setCaption] = useState("");
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string>("");
   const [progress, setProgress] = useState<UploadProgress>({
     stage: "idle",
     percent: 0,
@@ -82,6 +84,7 @@ export function UploadModal({ open, onClose, onSuccess }: UploadModalProps) {
   }, []);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const thumbnailInputRef = useRef<HTMLInputElement>(null);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -113,25 +116,25 @@ export function UploadModal({ open, onClose, onSuccess }: UploadModalProps) {
           })
       );
 
-      // 2. Generate & pin thumbnail
+      // 2. Pin thumbnail (custom or auto-generated)
       setProgress({
         stage: "transcoding",
         percent: 30,
-        message: "Transcoding video...",
+        message: thumbnailFile ? "Pinning cover image..." : "Transcoding video...",
       });
 
-      const thumbBlob = await generateThumbnail(file, 2);
       let thumbnailCid = "";
+      const thumbSource = thumbnailFile ?? await generateThumbnail(file, 2);
 
-      if (thumbBlob) {
+      if (thumbSource) {
         setProgress({
           stage: "pinning",
           percent: 50,
           message: "Pinning thumbnail to IPFS...",
         });
         thumbnailCid = await uploadFileToPinata(
-          thumbBlob,
-          `thumb-${Date.now()}.jpg`
+          thumbSource,
+          thumbnailFile ? `cover-${Date.now()}.${thumbnailFile.name.split(".").pop()}` : `thumb-${Date.now()}.jpg`
         );
       }
 
@@ -200,7 +203,21 @@ export function UploadModal({ open, onClose, onSuccess }: UploadModalProps) {
         txHash,
       });
 
-      onSuccess?.(metadataCid);
+      onSuccess?.({
+        cid: metadataCid,
+        playbackId,
+        caption,
+        hashtags: extractHashtags(caption),
+        duration: 0,
+        poster: address!,
+        posterEns: ensName || undefined,
+        timestamp: Date.now(),
+        likes: 0,
+        comments: 0,
+        tips: "0",
+        views: 0,
+        txHash: typeof txHash === "string" ? txHash : undefined,
+      });
     } catch (err) {
       setProgress({
         stage: "error",
@@ -214,6 +231,8 @@ export function UploadModal({ open, onClose, onSuccess }: UploadModalProps) {
     setFile(null);
     setPreview("");
     setCaption("");
+    setThumbnailFile(null);
+    setThumbnailPreview("");
     setProgress({ stage: "idle", percent: 0, message: "" });
   }, []);
 
@@ -432,6 +451,57 @@ export function UploadModal({ open, onClose, onSuccess }: UploadModalProps) {
                         </span>
                       </div>
                     </div>
+
+                    {/* Custom thumbnail */}
+                    {file && !isUploading && progress.stage !== "done" && (
+                      <div>
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                          Cover Image <span className="normal-case font-normal">(optional)</span>
+                        </p>
+                        {thumbnailPreview ? (
+                          <div className="relative rounded-xl overflow-hidden" style={{ aspectRatio: "16/9" }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={thumbnailPreview}
+                              alt="Cover preview"
+                              className="w-full h-full object-cover"
+                            />
+                            <button
+                              onClick={() => { setThumbnailFile(null); setThumbnailPreview(""); }}
+                              className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/70 flex items-center justify-center text-white hover:bg-black/90 transition-colors"
+                            >
+                              <X size={12} />
+                            </button>
+                            <div className="absolute bottom-2 left-2 bg-black/70 rounded-full px-2 py-0.5">
+                              <span className="text-white text-[10px] font-medium">Custom cover</span>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => thumbnailInputRef.current?.click()}
+                            className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-eth-border hover:border-neon-cyan/40 hover:bg-eth-surface/50 py-3 text-muted-foreground hover:text-white text-sm transition-colors"
+                          >
+                            <ImagePlus size={14} />
+                            Upload cover image
+                          </button>
+                        )}
+                        <input
+                          ref={thumbnailInputRef}
+                          type="file"
+                          accept="image/*"
+                          style={{ display: "none" }}
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) {
+                              setThumbnailFile(f);
+                              setThumbnailPreview(URL.createObjectURL(f));
+                            }
+                            e.target.value = "";
+                          }}
+                        />
+                      </div>
+                    )}
 
                     {/* Progress bar */}
                     {isUploading && (

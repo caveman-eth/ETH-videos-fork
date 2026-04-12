@@ -182,8 +182,9 @@ console.log("📤  Uploading to Pinata IPFS...\n");
 const form = new FormData();
 
 for (const { fullPath, relativePath } of files) {
+  // Pinata requires a common top-level directory prefix for multi-file uploads
   form.append("file", createReadStream(fullPath), {
-    filepath: `ethvideos-eth/${relativePath}`,
+    filepath: `app/${relativePath}`,
   });
 }
 
@@ -226,14 +227,31 @@ try {
   process.exit(1);
 }
 
+// Resolve inner "app/" CID via Pinata gateway headers
+let innerCid = cid;
+try {
+  // Fetch /app/index.html — the X-Ipfs-Roots header lists CIDs along the path:
+  // outerCid, appDirCid, indexHtmlCid  (we want index 1)
+  const r = await fetch(
+    `https://gateway.pinata.cloud/ipfs/${cid}/app/index.html`,
+    { method: "HEAD", headers: { Authorization: `Bearer ${PINATA_JWT}` } }
+  );
+  const roots = (r.headers.get("x-ipfs-roots") || "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (roots.length >= 2) {
+    innerCid = roots[1]; // index 0 = outer, index 1 = app/ dir
+  }
+} catch (e) {
+  console.warn("⚠️  Could not resolve inner CID:", e.message);
+}
+
 // ─── Step 5: Print result ──────────────────────────────────────────────────────
 console.log("\n✅  Deployed to IPFS!\n");
 console.log("━".repeat(60));
-console.log(`  CID:       ${cid}`);
-console.log(`  IPFS URL:  https://ipfs.io/ipfs/${cid}`);
-console.log(`  Pinata GW: https://gateway.pinata.cloud/ipfs/${cid}`);
+console.log(`  Outer CID: ${cid}`);
+console.log(`  App CID:   ${innerCid}`);
+console.log(`  IPFS URL:  https://ipfs.io/ipfs/${innerCid}`);
 console.log("━".repeat(60));
 console.log("\n📋  Next step — set this contenthash on app.ethvideos.eth:\n");
 console.log(`  ENS Manager: https://app.ens.domains/app.ethvideos.eth`);
-console.log(`  Content hash value: ipfs://${cid}`);
+console.log(`  Content hash value: ipfs://${innerCid}`);
 console.log("\n  Easiest: paste the CID into app.ens.domains → app.ethvideos.eth → Records → Content\n");

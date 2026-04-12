@@ -23,7 +23,7 @@ export default function FollowingPage() {
   }, [isConnected, following.length]);
 
   if (!isConnected) {
-    return <SplashScreen onConnected={() => {}} />;
+    return <SplashScreen onConnected={() => {}} onBrowse={() => router.push("/")} />;
   }
 
   return (

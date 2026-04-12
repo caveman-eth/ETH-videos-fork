@@ -50,9 +50,18 @@ export function useXMTP() {
         },
       };
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const client = await (Client.create as any)(signer, {
-        env: "production", // use "dev" for testnet
+      // Derive a deterministic 32-byte encryption key from the wallet.
+      // This avoids "Malformed 32 byte encryption key" errors caused by
+      // a missing or corrupted key stored in IndexedDB.
+      const keySignature = await walletClient.signMessage({
+        message: "ethvideos.eth XMTP encryption key v1",
+      });
+      // keccak256 of the hex signature → 32 bytes
+      const { keccak256, toBytes } = await import("viem");
+      const encryptionKey = toBytes(keccak256(keySignature as `0x${string}`));
+
+      const client = await Client.create(signer, encryptionKey, {
+        env: "production",
       });
 
       clientRef.current = client;

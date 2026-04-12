@@ -75,6 +75,12 @@ export function VideoPlayer({
     };
   }, [playbackId]);
 
+  // Sync muted via ref — React doesn't reliably sync the muted DOM attribute
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video) video.muted = muted;
+  }, [muted]);
+
   // Play/pause based on visibility
   useEffect(() => {
     const video = videoRef.current;
@@ -141,10 +147,10 @@ export function VideoPlayer({
       <video
         ref={videoRef}
         className={cn(
-          "absolute inset-0 w-full h-full object-cover transition-opacity duration-300",
+          "absolute inset-0 w-full h-full object-contain transition-opacity duration-300",
           loaded ? "opacity-100" : "opacity-0"
         )}
-        muted={muted}
+        muted
         playsInline
         loop
         preload="metadata"
@@ -188,15 +194,17 @@ export function VideoPlayer({
         <div className="absolute inset-0 shimmer-bg" />
       )}
 
-      {/* Mute button */}
+      {/* Mute / unmute button — prominent bottom-right */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           setMuted((m) => !m);
         }}
-        className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/40 flex items-center justify-center backdrop-blur-sm border border-white/10 text-white hover:bg-black/60 transition-colors"
+        className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full backdrop-blur-md border border-white/20 text-white transition-all active:scale-95"
+        style={{ background: "rgba(0,0,0,0.65)", padding: "6px 12px" }}
       >
-        {muted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+        {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+        <span className="text-xs font-semibold">{muted ? "Unmute" : "Mute"}</span>
       </button>
     </div>
   );

@@ -3,44 +3,95 @@
 import { useState, useCallback, useRef } from "react";
 import type { VideoMetadata, FeedTab } from "@/types";
 import { cachedENSLookup } from "./useENS";
+import { getLivepeerThumbnail } from "@/lib/livepeer";
 
 const PAGE_SIZE = 10;
+const SUBGRAPH_URL = process.env.NEXT_PUBLIC_SUBGRAPH_URL;
 
-// Mock data for development — replace with real indexer/API
-function generateMockVideo(index: number): VideoMetadata {
-  const addresses = [
-    "0x1234567890123456789012345678901234567890",
-    "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-    "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B",
-  ];
-  const captions = [
-    "gm frens 🌅 #ethereum #crypto",
-    "My on-chain journey started today ⛓️ #web3 #defi",
-    "This is what decentralization feels like 🔥 #ethvideos",
-    "ENS names are the future of identity #ens #ethereum",
-    "Base is cooking ser 🔵 #base #layer2",
-  ];
-  const poster = addresses[index % addresses.length];
-  const playbackIds = [
-    "f5eese2o5la7bgpn",
-    "2f7rj1i8h4h6lcpf",
-    "6d7el73r1y12chm8",
-  ];
+const VIDEOS_QUERY = `
+  query GetVideos($skip: Int!, $first: Int!) {
+    videos(
+      skip: $skip
+      first: $first
+      orderBy: timestamp
+      orderDirection: desc
+      where: { removed: false }
+    ) {
+      id
+      poster
+      ipfsCid
+      playbackId
+      caption
+      timestamp
+      likes
+    }
+  }
+`;
 
+const FOLLOWING_QUERY = `
+  query GetFollowingVideos($skip: Int!, $first: Int!, $posters: [Bytes!]!) {
+    videos(
+      skip: $skip
+      first: $first
+      orderBy: timestamp
+      orderDirection: desc
+      where: { removed: false, poster_in: $posters }
+    ) {
+      id
+      poster
+      ipfsCid
+      playbackId
+      caption
+      timestamp
+      likes
+    }
+  }
+`;
+
+interface SubgraphVideo {
+  id: string;
+  poster: string;
+  ipfsCid: string;
+  playbackId: string;
+  caption: string;
+  timestamp: string;
+  likes: string;
+}
+
+function mapToVideoMetadata(v: SubgraphVideo): VideoMetadata {
   return {
-    cid: `bafybeig${Math.random().toString(36).slice(2)}${index}`,
-    playbackId: playbackIds[index % playbackIds.length],
-    thumbnailUrl: `https://picsum.photos/seed/${index + 10}/400/700`,
-    caption: captions[index % captions.length],
-    hashtags: ["ethereum", "web3"],
-    duration: 15 + (index % 45),
-    poster,
-    timestamp: Math.floor(Date.now() / 1000) - index * 3600,
-    likes: Math.floor(Math.random() * 10000),
-    comments: Math.floor(Math.random() * 500),
-    tips: (Math.random() * 2).toFixed(4),
-    views: Math.floor(Math.random() * 100000),
+    cid: v.ipfsCid,
+    playbackId: v.playbackId,
+    thumbnailUrl: v.playbackId ? getLivepeerThumbnail(v.playbackId) : "",
+    caption: v.caption,
+    hashtags: extractHashtags(v.caption),
+    duration: 0,
+    poster: v.poster,
+    timestamp: parseInt(v.timestamp),
+    likes: parseInt(v.likes),
+    comments: 0,
+    tips: "0",
+    views: 0,
   };
+}
+
+function extractHashtags(caption: string): string[] {
+  const matches = caption.match(/#(\w+)/g);
+  return matches ? matches.map((t) => t.slice(1)).slice(0, 5) : [];
+}
+
+async function querySubgraph(
+  query: string,
+  variables: Record<string, unknown>
+): Promise<SubgraphVideo[]> {
+  if (!SUBGRAPH_URL) return [];
+  const res = await fetch(SUBGRAPH_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, variables }),
+  });
+  const json = await res.json();
+  return json.data?.videos ?? [];
 }
 
 export function useFeed(tab: FeedTab, followingAddresses: string[] = []) {
@@ -59,25 +110,27 @@ export function useFeed(tab: FeedTab, followingAddresses: string[] = []) {
       }
 
       try {
-        const params = new URLSearchParams({
-          tab,
-          page: String(page),
-          limit: String(PAGE_SIZE),
-          ...(tab === "following"
-            ? { following: followingAddresses.slice(0, 50).join(",") }
-            : {}),
-        });
+        let raw: SubgraphVideo[];
 
-        const res = await fetch(`/api/videos?${params}`);
-        if (!res.ok) throw new Error("Failed to fetch videos");
-        const data: VideoMetadata[] = await res.json();
+        if (tab === "following") {
+          raw = await querySubgraph(FOLLOWING_QUERY, {
+            skip: page * PAGE_SIZE,
+            first: PAGE_SIZE,
+            posters: followingAddresses.slice(0, 50).map((a) => a.toLowerCase()),
+          });
+        } else {
+          raw = await querySubgraph(VIDEOS_QUERY, {
+            skip: page * PAGE_SIZE,
+            first: PAGE_SIZE,
+          });
+        }
 
-        // Enrich with ENS data
         const enriched = await Promise.all(
-          data.map(async (video) => {
-            const ens = await cachedENSLookup(video.poster);
+          raw.map(async (v) => {
+            const mapped = mapToVideoMetadata(v);
+            const ens = await cachedENSLookup(v.poster);
             return {
-              ...video,
+              ...mapped,
               posterEns: ens.name ?? undefined,
               posterAvatar: ens.avatar ?? undefined,
             };
@@ -90,21 +143,12 @@ export function useFeed(tab: FeedTab, followingAddresses: string[] = []) {
           setVideos((prev) => [...prev, ...enriched]);
         }
 
-        setHasMore(data.length === PAGE_SIZE);
+        setHasMore(raw.length === PAGE_SIZE);
         pageRef.current = page + 1;
       } catch (err) {
         console.error("Feed fetch error:", err);
-        // Fall back to mock data for development
-        const mockData = Array.from({ length: PAGE_SIZE }, (_, i) =>
-          generateMockVideo(page * PAGE_SIZE + i)
-        );
-        if (refresh) {
-          setVideos(mockData);
-        } else {
-          setVideos((prev) => [...prev, ...mockData]);
-        }
-        setHasMore(page < 5);
-        pageRef.current = page + 1;
+        if (refresh) setVideos([]);
+        setHasMore(false);
       }
     },
     [tab, followingAddresses]

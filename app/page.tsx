@@ -9,33 +9,55 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { Header } from "@/components/layout/Header";
 import { UploadModal } from "@/components/video/UploadModal";
 import { XMTPInbox } from "@/components/messaging/XMTPInbox";
+import { ProfileRouteClient } from "@/app/profile/[address]/ProfileRouteClient";
 import { useFeed } from "@/hooks/useFeed";
 import { useEFPFollowing } from "@/hooks/useEFP";
 import type { FeedTab } from "@/types";
 
-type AppState = "splash" | "onboarding" | "app";
+type AppState = "splash" | "browse" | "onboarding" | "app" | "profile";
 
 export default function HomePage() {
   const { isConnected, address } = useAccount();
   const [appState, setAppState] = useState<AppState>("splash");
   const [tab, setTab] = useState<FeedTab>("for-you");
   const [showUpload, setShowUpload] = useState(false);
+  const [profileAddress, setProfileAddress] = useState<string>("");
 
   const { following } = useEFPFollowing(address);
-  const { videos, loading, refreshing, hasMore, loadInitial, loadMore, refresh } =
+  const { videos, loading, refreshing, hasMore, loadInitial, loadMore, refresh, prependVideo } =
     useFeed(tab, following);
 
-  // Restore session
+  // Restore session or handle connect/disconnect
   useEffect(() => {
     if (typeof window === "undefined") return;
     const hasOnboarded = localStorage.getItem("ethvideos-onboarded");
     if (isConnected && hasOnboarded === "true") {
       setAppState("app");
+    } else if (isConnected && (appState === "splash" || appState === "browse")) {
+      setAppState("onboarding");
+    } else if (!isConnected && appState === "app") {
+      // Wallet disconnected — return to splash
+      localStorage.removeItem("ethvideos-onboarded");
+      setAppState("splash");
     }
-  }, [isConnected]);
+  }, [isConnected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleConnected = useCallback(() => {
     setAppState("onboarding");
+  }, []);
+
+  const handleBrowse = useCallback(() => {
+    setAppState("browse");
+    loadInitial();
+  }, [loadInitial]);
+
+  const handleHome = useCallback(() => {
+    setAppState("splash");
+  }, []);
+
+  const handleProfileClick = useCallback((addr: string) => {
+    setProfileAddress(addr);
+    setAppState("profile");
   }, []);
 
   const handleOnboardingComplete = useCallback(() => {
@@ -52,7 +74,7 @@ export default function HomePage() {
     [loadInitial]
   );
 
-  // Load initial feed
+  // Load initial feed when entering app state
   useEffect(() => {
     if (appState === "app") {
       loadInitial();
@@ -60,20 +82,28 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appState]);
 
-  if (appState === "splash" || !isConnected) {
-    return <SplashScreen onConnected={handleConnected} />;
+  if (appState === "splash") {
+    return <SplashScreen onConnected={handleConnected} onBrowse={handleBrowse} />;
   }
 
   if (appState === "onboarding") {
     return <OnboardingFlow onComplete={handleOnboardingComplete} />;
   }
 
+  if (appState === "profile") {
+    return (
+      <ProfileRouteClient
+        address={profileAddress}
+        onBack={() => setAppState(isConnected ? "app" : "browse")}
+      />
+    );
+  }
+
+  // "browse" and "app" share the same feed UI
   return (
     <main className="relative h-dvh overflow-hidden bg-eth-dark">
-      {/* Transparent header (overlaid on feed) */}
-      <Header transparent />
+      <Header transparent onHome={appState === "browse" ? handleHome : undefined} />
 
-      {/* Main feed */}
       <FeedContainer
         videos={videos}
         loading={loading}
@@ -83,21 +113,22 @@ export default function HomePage() {
         onTabChange={handleTabChange}
         onLoadMore={loadMore}
         onRefresh={refresh}
+        onProfileClick={handleProfileClick}
       />
 
-      {/* Bottom navigation */}
-      <BottomNav onUploadClick={() => setShowUpload(true)} />
+      <BottomNav
+        onUploadClick={() => setShowUpload(true)}
+        onProfileClick={handleProfileClick}
+      />
 
-      {/* XMTP Inbox (floating) */}
       <XMTPInbox />
 
-      {/* Upload modal */}
       <UploadModal
         open={showUpload}
         onClose={() => setShowUpload(false)}
-        onSuccess={() => {
+        onSuccess={(video) => {
           setShowUpload(false);
-          refresh();
+          prependVideo(video);
         }}
       />
     </main>

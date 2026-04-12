@@ -23,5 +23,5 @@ export const wagmiConfig = getDefaultConfig({
     [sepolia.id]: http("https://eth-sepolia.g.alchemy.com/v2/demo"),
     [baseSepolia.id]: http("https://base-sepolia.g.alchemy.com/v2/demo"),
   },
-  ssr: true,
+  ssr: false,
 });

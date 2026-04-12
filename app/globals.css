@@ -50,30 +50,52 @@
     background: transparent;
   }
 
-  /* Feed scroll container */
+  /* Feed scroll container — YouTube-style vertical list */
   .feed-container {
-    scroll-snap-type: y mandatory;
-    overflow-y: scroll;
+    overflow-y: auto;
     height: 100dvh;
     -webkit-overflow-scrolling: touch;
-    padding: 8px 14px 84px;
+    /* 56px header + 48px tabs = 104px clearance */
+    padding: 104px 0 88px;
     background: transparent;
   }
 
-  .feed-item {
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
-    height: 84dvh;
-    border-radius: 24px;
-    overflow: hidden;
-    margin-bottom: 10px;
-    flex-shrink: 0;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  /* Desktop center column — 520px max, centered */
+  .feed-inner {
+    width: 100%;
   }
 
-  /* Video fill */
+  .feed-item {
+    /* Height determined by card content, not viewport */
+    width: 100%;
+    max-width: 520px;
+    margin: 0 auto 12px;
+    border-radius: 0;
+    overflow: visible;
+    flex-shrink: 0;
+  }
+
+  @media (min-width: 600px) {
+    .feed-container {
+      padding: 108px 16px 88px;
+    }
+    .feed-item {
+      border-radius: 20px;
+      overflow: hidden;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .feed-inner {
+      max-width: 520px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  }
+
+  /* Video: contain so full frame is always visible */
   video {
-    object-fit: cover;
+    object-fit: contain;
   }
 }
 

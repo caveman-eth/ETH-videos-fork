@@ -4,10 +4,11 @@ import { useEffect, useRef } from "react";
 import { motion, useAnimationFrame } from "motion/react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
-import { Play, Eye, Heart, ArrowRight, Upload, Radio } from "lucide-react";
+import { Play, ArrowRight, Upload, Radio } from "lucide-react";
 
 interface SplashScreenProps {
   onConnected: () => void;
+  onBrowse: () => void;
 }
 
 // ─── Theme: Void Broadcast ──────────────────────────────────────────────────
@@ -18,66 +19,34 @@ interface SplashScreenProps {
 const CARDS = [
   {
     id: 1,
-    title: "The Merge",
-    creator: "vitalik.eth",
-    views: "84K",
-    likes: "12K",
     bg: "linear-gradient(145deg, #100826 0%, #1e0d50 60%, #080318 100%)",
     glow: "rgba(168,85,247,0.4)",
     accentBar: "#a855f7",
-    span: "full",
   },
   {
     id: 2,
-    title: "DeFi Summer",
-    creator: "stani.eth",
-    views: "31K",
-    likes: "4.1K",
     bg: "linear-gradient(145deg, #041520 0%, #083050 60%, #030e18 100%)",
     glow: "rgba(56,189,248,0.35)",
     accentBar: "#38bdf8",
-    span: "half",
   },
   {
     id: 3,
-    title: "NFT Origins",
-    creator: "punk6529.eth",
-    views: "52K",
-    likes: "7.8K",
     bg: "linear-gradient(145deg, #180712 0%, #3d0a2e 60%, #100410 100%)",
     glow: "rgba(236,72,153,0.35)",
     accentBar: "#ec4899",
-    span: "half",
   },
   {
     id: 4,
-    title: "L2 Showdown",
-    creator: "kain.eth",
-    views: "18K",
-    likes: "2.3K",
     bg: "linear-gradient(145deg, #160d00 0%, #3d2600 60%, #100800 100%)",
     glow: "rgba(245,158,11,0.35)",
     accentBar: "#f59e0b",
-    span: "third",
   },
   {
     id: 5,
-    title: "Web3 Social",
-    creator: "lens.eth",
-    views: "29K",
-    likes: "5.5K",
     bg: "linear-gradient(145deg, #001a14 0%, #003d28 60%, #001010 100%)",
     glow: "rgba(16,185,129,0.35)",
     accentBar: "#10b981",
-    span: "two-thirds",
   },
-];
-
-const STATS = [
-  { value: "50K+", label: "Creators" },
-  { value: "2M+", label: "Videos" },
-  { value: "$8M+", label: "Tips Paid" },
-  { value: "0", label: "Servers" },
 ];
 
 const TICKER_ITEMS = [
@@ -96,7 +65,7 @@ const TICKER_ITEMS = [
 // Duplicate for infinite scroll
 const TICKER = [...TICKER_ITEMS, ...TICKER_ITEMS];
 
-export function SplashScreen({ onConnected }: SplashScreenProps) {
+export function SplashScreen({ onConnected, onBrowse }: SplashScreenProps) {
   const { isConnected } = useAccount();
 
   useEffect(() => {
@@ -340,31 +309,6 @@ export function SplashScreen({ onConnected }: SplashScreenProps) {
             Your ENS is your identity — forever.
           </motion.p>
 
-          {/* STATS */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.42 }}
-            className="flex items-center gap-6 mb-9 flex-wrap"
-          >
-            {STATS.map(({ value, label }, i) => (
-              <div key={label} className="flex flex-col">
-                <span
-                  className="font-black text-white"
-                  style={{ fontSize: "clamp(18px, 2vw, 26px)", letterSpacing: "-0.03em" }}
-                >
-                  {value}
-                </span>
-                <span
-                  className="text-[10px] font-semibold tracking-widest uppercase"
-                  style={{ color: "rgba(255,255,255,0.28)" }}
-                >
-                  {label}
-                </span>
-              </div>
-            ))}
-          </motion.div>
-
           {/* CTA ROW */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -402,6 +346,7 @@ export function SplashScreen({ onConnected }: SplashScreenProps) {
 
             {/* Secondary CTA */}
             <button
+              onClick={onBrowse}
               className="flex items-center gap-2 group"
               style={{
                 padding: "13px 22px",
@@ -414,7 +359,7 @@ export function SplashScreen({ onConnected }: SplashScreenProps) {
                 letterSpacing: "-0.01em",
               }}
             >
-              <span>Explore Videos</span>
+              <span>Browse Feed</span>
               <ArrowRight
                 size={13}
                 className="transition-transform duration-200 group-hover:translate-x-0.5"
@@ -554,19 +499,17 @@ function VideoCard({ card, height }: { card: (typeof CARDS)[0]; height: number }
         }}
       />
 
-      {/* Accent bar — thin colored line at bottom */}
+      {/* Accent bar */}
       <div
         className="absolute bottom-0 left-0 right-0 h-0.5"
         style={{ background: `linear-gradient(90deg, ${card.accentBar}, transparent)` }}
       />
 
       {/* Top-left: EV badge */}
-      <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+      <div className="absolute top-2.5 left-2.5">
         <div
-          className="w-5 h-5 rounded-md flex items-center justify-center flex-shrink-0"
-          style={{
-            background: "linear-gradient(135deg, #a855f7 0%, #38bdf8 100%)",
-          }}
+          className="w-5 h-5 rounded-md flex items-center justify-center"
+          style={{ background: "linear-gradient(135deg, #a855f7 0%, #38bdf8 100%)" }}
         >
           <Play size={9} fill="#03050e" style={{ color: "#03050e" }} className="ml-px" />
         </div>
@@ -578,38 +521,6 @@ function VideoCard({ card, height }: { card: (typeof CARDS)[0]; height: number }
         style={{ background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)" }}
       >
         <Play size={10} fill="white" style={{ color: "white" }} className="ml-0.5" />
-      </div>
-
-      {/* Bottom overlay: creator info */}
-      <div
-        className="absolute bottom-0 left-0 right-0 p-3"
-        style={{
-          background:
-            "linear-gradient(to top, rgba(3,5,14,0.92) 0%, rgba(3,5,14,0.5) 60%, transparent 100%)",
-        }}
-      >
-        <p
-          className="text-white font-semibold leading-tight mb-1"
-          style={{ fontSize: 12, letterSpacing: "-0.01em" }}
-        >
-          {card.title}
-        </p>
-        <div className="flex items-center gap-3">
-          <span
-            className="text-[10px] font-medium"
-            style={{ color: card.accentBar }}
-          >
-            {card.creator}
-          </span>
-          <span className="flex items-center gap-1" style={{ color: "rgba(255,255,255,0.35)" }}>
-            <Eye size={9} />
-            <span className="text-[9px]">{card.views}</span>
-          </span>
-          <span className="flex items-center gap-1" style={{ color: "rgba(255,255,255,0.35)" }}>
-            <Heart size={9} />
-            <span className="text-[9px]">{card.likes}</span>
-          </span>
-        </div>
       </div>
 
       {/* Hover: subtle border ring */}

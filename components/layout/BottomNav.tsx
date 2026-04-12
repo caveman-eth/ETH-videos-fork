@@ -17,9 +17,10 @@ const NAV_ITEMS = [
 
 interface BottomNavProps {
   onUploadClick?: () => void;
+  onProfileClick?: (address: string) => void;
 }
 
-export function BottomNav({ onUploadClick }: BottomNavProps) {
+export function BottomNav({ onUploadClick, onProfileClick }: BottomNavProps) {
   const pathname = usePathname();
   const { address } = useAccount();
 
@@ -50,12 +51,30 @@ export function BottomNav({ onUploadClick }: BottomNavProps) {
             }
 
             const isActive = pathname === href ||
-              (href === "/profile" && pathname.startsWith("/profile"));
+              (href === "/profile" && (pathname === "/profile" || pathname.startsWith("/profile/")));
+
+            if (href === "/profile") {
+              return (
+                <button
+                  key={href}
+                  onClick={() => address && onProfileClick?.(address)}
+                  className="tap-highlight-none flex-1 flex flex-col items-center justify-center gap-0.5 h-full"
+                >
+                  <motion.div
+                    whileTap={{ scale: 0.85 }}
+                    className="flex flex-col items-center gap-0.5 transition-all duration-200 text-muted-foreground"
+                  >
+                    <Icon size={22} />
+                    <span className="text-[11px] font-black tracking-tight">{label}</span>
+                  </motion.div>
+                </button>
+              );
+            }
 
             return (
               <Link
                 key={href}
-                href={href === "/profile" ? `/profile/${address || ""}` : href}
+                href={href}
                 className="tap-highlight-none flex-1 flex flex-col items-center justify-center gap-0.5 h-full"
               >
                 <motion.div

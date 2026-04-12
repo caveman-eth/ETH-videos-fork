@@ -1,6 +1,7 @@
 export const dynamic = "force-static";
 import { NextRequest, NextResponse } from "next/server";
 import type { VideoMetadata } from "@/types";
+import { getLivepeerThumbnail } from "@/lib/livepeer";
 
 const SUBGRAPH_URL = process.env.NEXT_PUBLIC_SUBGRAPH_URL;
 
@@ -98,9 +99,7 @@ function mapToVideoMetadata(v: SubgraphVideo): VideoMetadata {
   return {
     cid: v.ipfsCid,
     playbackId: v.playbackId,
-    thumbnailUrl: v.playbackId
-      ? `https://livepeercdn.studio/hls/${v.playbackId}/thumbnails/keyframe_0.png`
-      : "",
+    thumbnailUrl: v.playbackId ? getLivepeerThumbnail(v.playbackId) : "",
     caption: v.caption,
     hashtags: extractHashtags(v.caption),
     duration: 0,
@@ -126,9 +125,8 @@ export async function GET(request: NextRequest) {
   const following = searchParams.get("following")?.split(",").filter(Boolean) || [];
   const poster = searchParams.get("poster")?.toLowerCase() || null;
 
-  // Fall back to mock data if subgraph URL isn't configured yet
-  if (!SUBGRAPH_URL || SUBGRAPH_URL.includes("<YOUR_SUBGRAPH_ID>")) {
-    return NextResponse.json(getMockVideos(page, limit, tab, following));
+  if (!SUBGRAPH_URL) {
+    return NextResponse.json([], { status: 200 });
   }
 
   try {
@@ -172,44 +170,3 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ─── Mock fallback (used until subgraph is deployed) ─────────────────────────
-
-function getMockVideos(
-  page: number,
-  limit: number,
-  tab: string,
-  following: string[]
-): VideoMetadata[] {
-  const addresses = [
-    "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
-    "0xAb5801a7D398351b8bE11C439e05C5B3259aeC9B",
-    "0x1234567890123456789012345678901234567890",
-  ];
-
-  return Array.from({ length: limit }, (_, i) => {
-    const poster = addresses[(page * limit + i) % addresses.length];
-    if (tab === "following" && following.length > 0 && !following.includes(poster)) {
-      return null;
-    }
-    return {
-      cid: `bafybei${Math.random().toString(36).slice(2)}${page}${i}`,
-      playbackId: "f5eese2o5la7bgpn",
-      thumbnailUrl: `https://picsum.photos/seed/${page * 10 + i}/400/700`,
-      caption: [
-        "gm frens 🌅 #ethereum #web3",
-        "Building on Base today 🔵 #base",
-        "ENS names are forever ⛓️ #ens",
-        "DeFi summer but make it 2025 🌊 #defi",
-        "Zero knowledge everything 🕶️ #zk",
-      ][(page * limit + i) % 5],
-      hashtags: ["ethereum", "web3"],
-      duration: 15 + ((page * limit + i) % 45),
-      poster,
-      timestamp: Math.floor(Date.now() / 1000) - (page * limit + i) * 3600,
-      likes: Math.floor(Math.random() * 10000),
-      comments: Math.floor(Math.random() * 500),
-      tips: (Math.random() * 2).toFixed(4),
-      views: Math.floor(Math.random() * 100000),
-    };
-  }).filter(Boolean) as VideoMetadata[];
-}
